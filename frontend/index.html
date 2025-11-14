@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medallion Theatre - Ticket Management</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">🎭 Medallion Theatre</h1>
+            <ul class="nav-links">
+                <li><a href="index.html" class="active">Home</a></li>
+                <li><a href="booking.html">Book Tickets</a></li>
+                <li><a href="admin.html">Admin</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section class="hero">
+            <h2>Welcome to Medallion Theatre</h2>
+            <p>Experience world-class performances. Book your tickets today!</p>
+        </section>
+
+        <section class="shows-section">
+            <h2>🎭 Upcoming Shows</h2>
+            <div id="loading" class="loading">Loading shows...</div>
+            <div id="shows-list" class="shows-grid"></div>
+            <div id="error-message" class="error-message" style="display: none;"></div>
+        </section>
+
+        <section class="search-section">
+            <h2>🔍 Search Your Booking</h2>
+            <p style="color: #666; margin-bottom: 1rem;">Enter your name or email to find your bookings</p>
+            <div class="search-form">
+                <input 
+                    type="text" 
+                    id="search-input" 
+                    placeholder="Enter customer name or email"
+                    class="search-input"
+                >
+                <button onclick="searchBooking()" class="btn btn-primary">Search</button>
+            </div>
+            <div id="search-results" class="search-results"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Medallion Theatre. All rights reserved.</p>
+    </footer>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadShows();
+            
+            // Allow Enter key to trigger search
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        searchBooking();
+                    }
+                });
+            }
+        });
+
+        async function loadShows() {
+            const loadingDiv = document.getElementById('loading');
+            const showsList = document.getElementById('shows-list');
+            const errorDiv = document.getElementById('error-message');
+
+            try {
+                loadingDiv.style.display = 'block';
+                const response = await fetch(`${API_URL}/shows`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load shows');
+                }
+
+                const shows = await response.json();
+                loadingDiv.style.display = 'none';
+
+                if (shows.length === 0) {
+                    showsList.innerHTML = `
+                        <div style="text-align: center; padding: 3rem; background: white; border-radius: 10px; grid-column: 1/-1;">
+                            <h3 style="color: #667eea; margin-bottom: 1rem;">No Shows Available Yet</h3>
+                            <p style="color: #666; margin-bottom: 1rem;">Check back soon for upcoming performances!</p>
+                            <p style="color: #999; font-size: 0.9rem;">Admins: Add shows in the <a href="admin.html" style="color: #667eea;">Admin Panel</a></p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                showsList.innerHTML = shows.map(show => {
+                    const showDate = new Date(show.date);
+                    const isUpcoming = showDate >= new Date();
+                    const availabilityPercent = (show.availableSeats / show.totalSeats) * 100;
+                    let availabilityColor = '#2ecc71';
+                    if (availabilityPercent < 50) availabilityColor = '#f39c12';
+                    if (availabilityPercent < 20) availabilityColor = '#e74c3c';
+                    
+                    return `
+                        <div class="show-card">
+                            <h3>${show.title}</h3>
+                            <p><strong>📅 Date:</strong> ${showDate.toLocaleDateString('en-US', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                            })}</p>
+                            <p><strong>🕐 Time:</strong> ${show.time}</p>
+                            <p><strong>📍 Venue:</strong> ${show.venue || 'Medallion Theatre'}</p>
+                            <p><strong>💰 Price:</strong> $${show.ticketPrice}</p>
+                            <p><strong>🎫 Available:</strong> <span style="color: ${availabilityColor}; font-weight: bold;">${show.availableSeats}</span> / ${show.totalSeats} seats</p>
+                            ${show.description ? `<p style="margin-top: 1rem; color: #666; font-style: italic;">${show.description}</p>` : ''}
+                            ${isUpcoming && show.availableSeats > 0 ? `
+                                <a href="booking.html" class="btn btn-primary" style="display: inline-block; margin-top: 1rem; text-decoration: none;">
+                                    📝 Book Now
+                                </a>
+                            ` : `
+                                <button class="btn" style="background: #95a5a6; cursor: not-allowed; margin-top: 1rem;" disabled>
+                                    ${show.availableSeats === 0 ? 'Sold Out' : 'Past Show'}
+                                </button>
+                            `}
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                errorDiv.textContent = `Error: ${error.message}. Please make sure the server is running on http://localhost:5000`;
+                errorDiv.style.display = 'block';
+                console.error('Error loading shows:', error);
+            }
+        }
+
+        async function searchBooking() {
+            const searchInput = document.getElementById('search-input').value.trim();
+            const resultsDiv = document.getElementById('search-results');
+
+            if (!searchInput) {
+                resultsDiv.innerHTML = '<p style="color: #e74c3c; text-align: center;">⚠️ Please enter a customer name or email.</p>';
+                return;
+            }
+
+            try {
+                resultsDiv.innerHTML = '<p style="text-align: center;">🔍 Searching...</p>';
+
+                const customerResponse = await fetch(`${API_URL}/customers`);
+                const customers = await customerResponse.json();
+                
+                const matchedCustomers = customers.filter(customer => 
+                    customer.firstName.toLowerCase().includes(searchInput.toLowerCase()) ||
+                    customer.lastName.toLowerCase().includes(searchInput.toLowerCase()) ||
+                    customer.email.toLowerCase().includes(searchInput.toLowerCase())
+                );
+
+                if (matchedCustomers.length === 0) {
+                    resultsDiv.innerHTML = '<p style="text-align: center; color: #666;">❌ No bookings found with that name or email.</p>';
+                    return;
+                }
+
+                const ticketsResponse = await fetch(`${API_URL}/tickets`);
+                const allTickets = await ticketsResponse.json();
+
+                const customerTickets = allTickets.filter(ticket => 
+                    matchedCustomers.some(customer => customer._id === ticket.customer._id)
+                );
+
+                if (customerTickets.length === 0) {
+                    resultsDiv.innerHTML = '<p style="text-align: center; color: #666;">No bookings found for this customer.</p>';
+                    return;
+                }
+
+                resultsDiv.innerHTML = `
+                    <h3 style="margin-bottom: 1.5rem; color: #667eea; text-align: center;">✅ Found ${customerTickets.length} Booking(s)</h3>
+                    ${customerTickets.map(ticket => `
+                        <div class="show-card" style="margin-bottom: 1.5rem; border-left: 4px solid #667eea;">
+                            <h4 style="color: #667eea;">🎟️ Booking #${ticket._id.slice(-8).toUpperCase()}</h4>
+                            <p><strong>Show:</strong> ${ticket.show.title}</p>
+                            <p><strong>Date:</strong> ${new Date(ticket.show.date).toLocaleDateString()} at ${ticket.show.time}</p>
+                            <p><strong>Customer:</strong> ${ticket.customer.firstName} ${ticket.customer.lastName}</p>
+                            <p><strong>Email:</strong> ${ticket.customer.email}</p>
+                            <p><strong>Phone:</strong> ${ticket.customer.phone}</p>
+                            <p><strong>Seats:</strong> <span style="background: #667eea; color: white; padding: 0.25rem 0.5rem; border-radius: 3px;">${ticket.seatNumbers.join(', ')}</span></p>
+                            <p><strong>Number of Tickets:</strong> ${ticket.numberOfTickets}</p>
+                            <p><strong>Total Price:</strong> <span style="color: #2ecc71; font-weight: bold; font-size: 1.2rem;">$${ticket.totalPrice}</span></p>
+                            <p><strong>Status:</strong> <span style="color: ${ticket.status === 'confirmed' ? '#2ecc71' : '#f39c12'}; font-weight: bold; text-transform: uppercase;">${ticket.status}</span></p>
+                            <p style="color: #999; font-size: 0.9rem;"><strong>Booked on:</strong> ${new Date(ticket.bookingDate).toLocaleString()}</p>
+                        </div>
+                    `).join('')}
+                `;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: #e74c3c; text-align: center;">❌ Error: ${error.message}</p>`;
+                console.error('Error searching bookings:', error);
+            }
+        }
+    </script>
+</body>
+</html>

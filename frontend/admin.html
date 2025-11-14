@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Medallion Theatre</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">🎭 Medallion Theatre</h1>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="booking.html">Book Tickets</a></li>
+                <li><a href="admin.html" class="active">Admin</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h2>Admin Panel</h2>
+        
+        <div class="admin-tabs">
+            <button class="tab-btn active" onclick="showTab('shows')">Manage Shows</button>
+            <button class="tab-btn" onclick="showTab('bookings')">View Bookings</button>
+            <button class="tab-btn" onclick="showTab('stats')">Statistics</button>
+        </div>
+
+        <div id="shows-tab" class="tab-content active">
+            <h3>Add New Show</h3>
+            <form id="add-show-form" class="admin-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="show-title">Title *</label>
+                        <input type="text" id="show-title" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="show-date">Date *</label>
+                        <input type="date" id="show-date" required class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="show-time">Time *</label>
+                        <input type="time" id="show-time" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="show-price">Ticket Price *</label>
+                        <input type="number" id="show-price" min="0" step="0.01" required class="form-control">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="show-seats">Total Seats *</label>
+                        <input type="number" id="show-seats" min="1" required class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="show-venue">Venue</label>
+                        <input type="text" id="show-venue" value="Medallion Theatre" class="form-control">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="show-description">Description</label>
+                    <textarea id="show-description" rows="3" class="form-control"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Show</button>
+            </form>
+
+            <h3>Existing Shows</h3>
+            <div id="admin-shows-list" class="admin-list"></div>
+        </div>
+
+        <div id="bookings-tab" class="tab-content">
+            <h3>All Bookings</h3>
+            <div id="bookings-list" class="admin-list"></div>
+        </div>
+
+        <div id="stats-tab" class="tab-content">
+            <h3>Theatre Statistics</h3>
+            <div id="statistics" class="stats-grid"></div>
+        </div>
+
+        <div id="admin-message" class="message-box" style="display: none;"></div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Medallion Theatre. All rights reserved.</p>
+    </footer>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAdminShows();
+            loadBookings();
+            loadStatistics();
+            
+            document.getElementById('add-show-form').addEventListener('submit', handleAddShow);
+        });
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function handleAddShow(e) {
+            e.preventDefault();
+            
+            const showData = {
+                title: document.getElementById('show-title').value,
+                date: document.getElementById('show-date').value,
+                time: document.getElementById('show-time').value,
+                ticketPrice: parseFloat(document.getElementById('show-price').value),
+                totalSeats: parseInt(document.getElementById('show-seats').value),
+                venue: document.getElementById('show-venue').value,
+                description: document.getElementById('show-description').value
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/shows`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(showData)
+                });
+
+                if (response.ok) {
+                    showMessage('Show added successfully!', 'success');
+                    document.getElementById('add-show-form').reset();
+                    loadAdminShows();
+                    loadStatistics();
+                } else {
+                    showMessage('Failed to add show', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function loadAdminShows() {
+            try {
+                const response = await fetch(`${API_URL}/shows`);
+                const shows = await response.json();
+                
+                const container = document.getElementById('admin-shows-list');
+                if (shows.length === 0) {
+                    container.innerHTML = '<p>No shows yet. Add one above!</p>';
+                    return;
+                }
+                
+                container.innerHTML = shows.map(show => `
+                    <div class="admin-card">
+                        <h4>${show.title}</h4>
+                        <p><strong>Date:</strong> ${new Date(show.date).toLocaleDateString()} at ${show.time}</p>
+                        <p><strong>Price:</strong> $${show.ticketPrice} | <strong>Available:</strong> ${show.availableSeats}/${show.totalSeats}</p>
+                        <p>${show.description || 'No description'}</p>
+                        <button onclick="deleteShow('${show._id}')" class="btn btn-danger btn-small">Delete</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading shows:', error);
+            }
+        }
+
+        async function loadBookings() {
+            try {
+                const response = await fetch(`${API_URL}/tickets`);
+                const tickets = await response.json();
+                
+                const container = document.getElementById('bookings-list');
+                if (tickets.length === 0) {
+                    container.innerHTML = '<p>No bookings yet.</p>';
+                    return;
+                }
+                
+                container.innerHTML = tickets.map(ticket => `
+                    <div class="admin-card">
+                        <h4>Booking #${ticket._id.slice(-6)}</h4>
+                        <p><strong>Show:</strong> ${ticket.show.title}</p>
+                        <p><strong>Customer:</strong> ${ticket.customer.firstName} ${ticket.customer.lastName}</p>
+                        <p><strong>Email:</strong> ${ticket.customer.email}</p>
+                        <p><strong>Seats:</strong> ${ticket.seatNumbers.join(', ')}</p>
+                        <p><strong>Total:</strong> $${ticket.totalPrice}</p>
+                        <p><strong>Status:</strong> <span class="badge">${ticket.status}</span></p>
+                        <button onclick="cancelBooking('${ticket._id}')" class="btn btn-danger btn-small">Cancel</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading bookings:', error);
+            }
+        }
+
+        async function loadStatistics() {
+            try {
+                const [showsRes, ticketsRes] = await Promise.all([
+                    fetch(`${API_URL}/shows`),
+                    fetch(`${API_URL}/tickets`)
+                ]);
+                
+                const shows = await showsRes.json();
+                const tickets = await ticketsRes.json();
+                
+                const totalRevenue = tickets.reduce((sum, t) => sum + t.totalPrice, 0);
+                const totalTickets = tickets.reduce((sum, t) => sum + t.numberOfTickets, 0);
+                
+                document.getElementById('statistics').innerHTML = `
+                    <div class="stat-card">
+                        <h3>${shows.length}</h3>
+                        <p>Total Shows</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${tickets.length}</h3>
+                        <p>Total Bookings</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>${totalTickets}</h3>
+                        <p>Tickets Sold</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>$${totalRevenue.toFixed(2)}</h3>
+                        <p>Total Revenue</p>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+            }
+        }
+
+        async function deleteShow(id) {
+            if (!confirm('Are you sure you want to delete this show?')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/shows/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('Show deleted successfully', 'success');
+                    loadAdminShows();
+                    loadStatistics();
+                } else {
+                    showMessage('Failed to delete show', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function cancelBooking(id) {
+            if (!confirm('Are you sure you want to cancel this booking?')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/tickets/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('Booking cancelled successfully', 'success');
+                    loadBookings();
+                    loadAdminShows();
+                    loadStatistics();
+                } else {
+                    showMessage('Failed to cancel booking', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        function showMessage(message, type) {
+            const msgBox = document.getElementById('admin-message');
+            msgBox.textContent = message;
+            msgBox.className = `message-box ${type}`;
+            msgBox.style.display = 'block';
+            setTimeout(() => msgBox.style.display = 'none', 3000);
+        }
+    </script>
+</body>
+</html>
