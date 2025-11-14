@@ -212,7 +212,11 @@
     </footer>
 
     <script>
-        const API_URL = 'http://localhost:5000/api';
+        // UPDATED: Dynamic API URL for production
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:5000/api'
+            : 'https://theatre-ticket-system.onrender.com/api';
+        
         let selectedShow = null;
         let selectedSeats = [];
         let bookedSeats = [];
@@ -250,7 +254,7 @@
                 });
             } catch (error) {
                 console.error('Error loading shows:', error);
-                showError('Failed to load shows. Make sure the server is running at http://localhost:5000');
+                showError('Failed to load shows. Make sure the server is running.');
             }
         }
 

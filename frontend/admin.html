@@ -89,7 +89,10 @@
     </footer>
 
     <script>
-        const API_URL = 'http://localhost:5000/api';
+        // UPDATED: Dynamic API URL for production
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:5000/api'
+            : 'https://theatre-ticket-system.onrender.com/api';
 
         document.addEventListener('DOMContentLoaded', () => {
             loadAdminShows();
